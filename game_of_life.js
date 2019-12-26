@@ -2,6 +2,10 @@ import glslangModule from 'https://unpkg.com/@webgpu/glslang@0.0.8/dist/web-deve
 
 (async () => {
 
+    if (!navigator.gpu) {
+        alert('WebGPU not supported! To see this content, you must use Chrome Canary and enable this UNSAFE flag: chrome://flags/#enable-unsafe-webgpu');
+    }
+
     const gridSize = 64;
     const cellsCount = gridSize * gridSize;
 
