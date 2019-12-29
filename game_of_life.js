@@ -1,13 +1,7 @@
-import glslangModule from 'https://unpkg.com/@webgpu/glslang@0.0.8/dist/web-devel/glslang.js';
+import shaderCompilerModule from './ShaderCompiler.js'
 import vertexShaderGLSL from './vertex_shader.js'
 import fragmentShader from './fragment_shader.js'
 import computeShader from './compute1d_numThread64.js'
-
-// TODO: enable / disable grid
-// Add sliders to move around the grid
-// Let the user choose grid resolution
-// Optimize compute shader further
-// Let the user draw patterns
 
 (async () => {
 
@@ -30,9 +24,9 @@ import computeShader from './compute1d_numThread64.js'
 
     const globalDefines = 
         "#version 450\n" +
-        "#define CELLS_COUNT "  + cellsCount  + "\n" +
-        "#define GRID_SIZE "    + gridSize    + "\n" + 
-        "#define PIXELS_PER_CELL " + scaleFactor + "\n";
+        "#define CELLS_COUNT "      + cellsCount  + "\n" +
+        "#define GRID_SIZE "        + gridSize    + "\n" + 
+        "#define PIXELS_PER_CELL "  + scaleFactor + "\n";
 
     const fragmentShaderGLSL = globalDefines + fragmentShader;
 
@@ -43,7 +37,8 @@ import computeShader from './compute1d_numThread64.js'
 
     const adapter = await navigator.gpu.requestAdapter();
     const device = await adapter.requestDevice();
-    const glslang = await glslangModule();
+    const ShaderCompiler = await shaderCompilerModule();
+    const compileShader = ShaderCompiler.compileShader;
 
     const context = canvas.getContext('gpupresent');
 
@@ -64,7 +59,7 @@ import computeShader from './compute1d_numThread64.js'
         layout: computePipelineLayout,
         computeStage: {
             module: device.createShaderModule({
-                code: glslang.compileGLSL(computeShaderGLSL, "compute"),
+                code: compileShader(computeShaderGLSL, "compute"),
             }),
             entryPoint: "main"
         },
@@ -136,13 +131,13 @@ import computeShader from './compute1d_numThread64.js'
 
         vertexStage: {
             module: device.createShaderModule({
-                code: glslang.compileGLSL(vertexShaderGLSL, "vertex"),
+                code: compileShader(vertexShaderGLSL, "vertex"),
             }),
             entryPoint: "main"
         },
         fragmentStage: {
             module: device.createShaderModule({
-                code: glslang.compileGLSL(fragmentShaderGLSL, "fragment"),
+                code: compileShader(fragmentShaderGLSL, "fragment"),
             }),
             entryPoint: "main"
         },
@@ -201,7 +196,7 @@ import computeShader from './compute1d_numThread64.js'
 
             // compute1d:               computePassEncoder.dispatch(gridSize * gridSize);
             // compute2d:               computePassEncoder.dispatch(gridSize, gridSize);
-            // compute1d_numThread64 :  computePassEncoder.dispatch(Math.ceil(gridSize * gridSize / localComputeSize));
+            // compute1d_numThread64:   computePassEncoder.dispatch(Math.ceil(gridSize * gridSize / localComputeSize));
 
             // Render pass
             const renderPassEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
