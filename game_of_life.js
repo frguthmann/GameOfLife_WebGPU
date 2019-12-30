@@ -1,7 +1,34 @@
 import shaderCompilerModule from './ShaderCompiler.js'
 import vertexShaderGLSL from './vertex_shader.js'
 import fragmentShader from './fragment_shader.js'
-import computeShader from './compute1d_numThread64.js'
+
+import computeShader0 from './compute1d.js'
+import computeShader1 from './compute2d.js'
+import computeShader2 from './compute1d_multipleThreads.js'
+import computeShader3 from './compute2d_multipleThreads.js'
+
+const computeMode = 3;
+const gridSize = 32;
+const localComputeSize = 32;
+const slowMode = true;
+
+const computeShaders = [computeShader0, computeShader1, computeShader2, computeShader3];
+const computeShader = computeShaders[computeMode];
+
+function customDispatch(iEncoder, iSizeX, iSizeY){
+    if(computeMode == 0){
+      iEncoder.dispatch(iSizeX * iSizeY);
+    }
+    else if(computeMode == 1){
+      iEncoder.dispatch(iSizeX, iSizeY);
+    }
+    else if(computeMode == 2){
+      iEncoder.dispatch(Math.ceil(iSizeX * iSizeY / localComputeSize));
+    }
+    else if(computeMode == 3){
+      iEncoder.dispatch(Math.ceil(iSizeX / localComputeSize), Math.ceil(iSizeY / localComputeSize));
+    }   
+} 
 
 (async () => {
 
@@ -10,17 +37,14 @@ import computeShader from './compute1d_numThread64.js'
     }
 
     const canvas = document.getElementById("webGPUCanvas");
-    const gridSize = 10;
     const cellsCount  = gridSize * gridSize;
  
-    const density = ( canvas.width - 1)  / gridSize;
+    /*const density = ( canvas.width - 1)  / gridSize;
     if(density < 3.0){
         canvas.width = canvas.height = ( 3.0 * gridSize) + 1;
-    }
+    }*/
 
     const scaleFactor = Math.floor( (canvas.width - 1) / gridSize);
-    
-    const localComputeSize = 64;
 
     const globalDefines = 
         "#version 450\n" +
@@ -175,40 +199,51 @@ import computeShader from './compute1d_numThread64.js'
         }]
     };
 
-    let t = 0;
+    let iteration = 0;
+    let averageTime = 0;
     let previousTime = 0;
     async function frame(iTimeStamp) {
 
-        console.log(iTimeStamp - previousTime);
-        if( iTimeStamp - previousTime > 250){
-            previousTime = iTimeStamp;
-
-            // Get next available image view from swap chain
-            renderPassDescriptor.colorAttachments[0].attachment = swapChain.getCurrentTexture().createView();
-            const commandEncoder = device.createCommandEncoder({});
-
-            // Compute pass
-            const computePassEncoder = commandEncoder.beginComputePass();
-            computePassEncoder.setPipeline(computePipeline);
-            computePassEncoder.setBindGroup(0, computeBindGroups[t % 2]);
-            computePassEncoder.dispatch(Math.ceil(gridSize * gridSize / localComputeSize));
-            computePassEncoder.endPass();
-
-            // compute1d:               computePassEncoder.dispatch(gridSize * gridSize);
-            // compute2d:               computePassEncoder.dispatch(gridSize, gridSize);
-            // compute1d_numThread64:   computePassEncoder.dispatch(Math.ceil(gridSize * gridSize / localComputeSize));
-
-            // Render pass
-            const renderPassEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
-            renderPassEncoder.setPipeline(renderPipeline);
-            renderPassEncoder.setBindGroup(0, renderBindGroups[t % 2]);
-            renderPassEncoder.draw(3, 1, 0, 0);
-            renderPassEncoder.endPass();
-
-            // Submit commands to the GPU
-            device.defaultQueue.submit([commandEncoder.finish()]);
-            t++;
+        // Early out in slow mode
+        if( slowMode === true ){
+            if(iTimeStamp - previousTime < 100){
+                requestAnimationFrame(frame);
+                return;
+            }
+        }else{
+            // Forget about the first 10 operations
+            if(iteration === 10){
+                averageTime = iTimeStamp - previousTime;
+            }else{
+                const averageTimeFactor = (iteration - 1) / iteration;
+                averageTime = averageTime * averageTimeFactor + (iTimeStamp - previousTime) * (1 - averageTimeFactor);
+            }
+            console.log(averageTime);
         }
+
+        previousTime = iTimeStamp;
+
+        // Get next available image view from swap chain
+        renderPassDescriptor.colorAttachments[0].attachment = swapChain.getCurrentTexture().createView();
+        const commandEncoder = device.createCommandEncoder({});
+
+        // Compute pass
+        const computePassEncoder = commandEncoder.beginComputePass();
+        computePassEncoder.setPipeline(computePipeline);
+        computePassEncoder.setBindGroup(0, computeBindGroups[iteration % 2]);
+        customDispatch(computePassEncoder, gridSize, gridSize);
+        computePassEncoder.endPass();
+
+        // Render pass
+        const renderPassEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+        renderPassEncoder.setPipeline(renderPipeline);
+        renderPassEncoder.setBindGroup(0, renderBindGroups[iteration % 2]);
+        renderPassEncoder.draw(3, 1, 0, 0);
+        renderPassEncoder.endPass();
+
+        // Submit commands to the GPU
+        device.defaultQueue.submit([commandEncoder.finish()]);
+        iteration++;
 
         requestAnimationFrame(frame);
     }
