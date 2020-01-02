@@ -3,32 +3,37 @@ import vertexShaderGLSL from './vertex_shader.js'
 import fragmentShader from './fragment_shader.js'
 
 import computeShader0 from './compute1d.js'
-import computeShader1 from './compute2d.js'
-import computeShader2 from './compute1d_multipleThreads.js'
-import computeShader3 from './compute2d_multipleThreads.js'
+import computeShader1 from './compute1d_multipleThreads_1d.js'
+import computeShader2 from './compute1d_multipleThreads_2d.js'
+import computeShader3 from './compute2d.js'
+import computeShader4 from './compute2d_multipleThreads_1d.js'
+import computeShader5 from './compute2d_multipleThreads_2d.js'
 
-const computeMode = 3;
-const gridSize = 32;
-const localComputeSize = 32;
-const slowMode = true;
+const computeShaders = [computeShader0, computeShader1, computeShader2, computeShader3, computeShader4, computeShader5];
 
-const computeShaders = [computeShader0, computeShader1, computeShader2, computeShader3];
-const computeShader = computeShaders[computeMode];
+const computeMode = 4;
+const gridSize = 49;
+const threadsPerGroup = 64;
+const threadsPerDirectionXY = Math.sqrt(threadsPerGroup); 
+const slowMode = false;
 
-function customDispatch(iEncoder, iSizeX, iSizeY){
-    if(computeMode == 0){
-      iEncoder.dispatch(iSizeX * iSizeY);
-    }
-    else if(computeMode == 1){
-      iEncoder.dispatch(iSizeX, iSizeY);
-    }
-    else if(computeMode == 2){
-      iEncoder.dispatch(Math.ceil(iSizeX * iSizeY / localComputeSize));
-    }
-    else if(computeMode == 3){
-      iEncoder.dispatch(Math.ceil(iSizeX / localComputeSize), Math.ceil(iSizeY / localComputeSize));
-    }   
-} 
+const dispatchX = [
+    gridSize * gridSize, 
+    Math.ceil(gridSize * gridSize / threadsPerGroup), 
+    Math.ceil(gridSize * gridSize / threadsPerGroup),
+    gridSize,
+    Math.ceil(gridSize / threadsPerDirectionXY),
+    Math.ceil(gridSize / threadsPerDirectionXY)
+];
+
+const dispatchY = [
+    1, 
+    1, 
+    1,
+    gridSize,
+    Math.ceil(gridSize / threadsPerDirectionXY),
+    Math.ceil(gridSize / threadsPerDirectionXY)
+];
 
 (async () => {
 
@@ -55,9 +60,13 @@ function customDispatch(iEncoder, iSizeX, iSizeY){
     const fragmentShaderGLSL = globalDefines + fragmentShader;
 
     const computeDefines = 
-        "#define LOCAL_SIZE " + localComputeSize + "\n";
+        "#define DISPATCH_X "          + dispatchX[computeMode]       + "\n" +
+        "#define DISPATCH_Y "          + dispatchY[computeMode]       + "\n" +
+        "#define THREADS_PER_GROUP "   + threadsPerGroup       + "\n" + 
+        "#define THREADS_PER_GROUP_X " + threadsPerDirectionXY + "\n" + 
+        "#define THREADS_PER_GROUP_Y " + threadsPerDirectionXY + "\n"; 
 
-    const computeShaderGLSL = globalDefines + computeDefines + computeShader;
+    const computeShaderGLSL = globalDefines + computeDefines + computeShaders[computeMode];
 
     const adapter = await navigator.gpu.requestAdapter();
     const device = await adapter.requestDevice();
@@ -206,7 +215,7 @@ function customDispatch(iEncoder, iSizeX, iSizeY){
 
         // Early out in slow mode
         if( slowMode === true ){
-            if(iTimeStamp - previousTime < 100){
+            if(iTimeStamp - previousTime < 500){
                 requestAnimationFrame(frame);
                 return;
             }
@@ -231,7 +240,7 @@ function customDispatch(iEncoder, iSizeX, iSizeY){
         const computePassEncoder = commandEncoder.beginComputePass();
         computePassEncoder.setPipeline(computePipeline);
         computePassEncoder.setBindGroup(0, computeBindGroups[iteration % 2]);
-        customDispatch(computePassEncoder, gridSize, gridSize);
+        computePassEncoder.dispatch(dispatchX[computeMode], dispatchY[computeMode]);
         computePassEncoder.endPass();
 
         // Render pass

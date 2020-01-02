@@ -1,6 +1,6 @@
 const computeShader =  `
 
-layout(local_size_x = LOCAL_SIZE) in;
+layout(local_size_x = THREADS_PER_GROUP_X, local_size_y = THREADS_PER_GROUP_Y) in;
 
 layout(std430, set = 0, binding = 0) buffer SrcGrid {
     float state[CELLS_COUNT];
@@ -18,8 +18,7 @@ const ivec2 sampleXYOffsets[] = {
 
 void main() {
 
-    // uint globalId = gl_GlobalInvocationID.x;
-    uint globalId = (gl_WorkGroupID * gl_WorkGroupSize + gl_LocalInvocationID).x;
+    uint globalId = gl_GlobalInvocationID.x * THREADS_PER_GROUP_Y + gl_GlobalInvocationID.y;
 
     int aliveNeighbors = 0;
     for( int i = 0; i < 8; i++ ){
@@ -35,7 +34,7 @@ void main() {
         aliveNeighbors += int(srcGrid.state[neighborIndex]);
     }
 
-    uint currentCellIndex = globalId.x;
+    uint currentCellIndex = globalId;
     float currentCellState = srcGrid.state[currentCellIndex];
 
     // Make sure to copy the current data before updating it

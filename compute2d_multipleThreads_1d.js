@@ -1,6 +1,6 @@
 const computeShader =  `
 
-layout(local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
+layout(local_size_x = THREADS_PER_GROUP) in;
 
 layout(std430, set = 0, binding = 0) buffer SrcGrid {
     float state[CELLS_COUNT];
@@ -18,16 +18,20 @@ const ivec2 sampleXYOffsets[] = {
 
 void main() {
 
-    if(gl_GlobalInvocationID.x >= GRID_SIZE || gl_GlobalInvocationID.y >= GRID_SIZE){
+    // gl_NumWorkGroups makes the shader crash, had to pass it as a define :(
+    uint globalId = gl_GlobalInvocationID.x * DISPATCH_Y + gl_GlobalInvocationID.y;
+
+    /*if(globalId < 1024){
+        dstGrid.state[globalId] = 1.0;
         return;
-    }
+    }*/
 
     int aliveNeighbors = 0;
     for( int i = 0; i < 8; i++ ){
 
         uvec2 coords;
-        coords.y = int(gl_GlobalInvocationID.y);
-        coords.x = int(gl_GlobalInvocationID.x);
+        coords.y = int(globalId) / GRID_SIZE;
+        coords.x = int(globalId) - coords.y * GRID_SIZE;
 
         // Bring everything above 0 to be able to use the modulo operator
         coords = (coords + sampleXYOffsets[i] + GRID_SIZE) % GRID_SIZE;
@@ -36,7 +40,7 @@ void main() {
         aliveNeighbors += int(srcGrid.state[neighborIndex]);
     }
 
-    uint currentCellIndex = gl_GlobalInvocationID.x + gl_GlobalInvocationID.y * GRID_SIZE;
+    uint currentCellIndex = globalId;
     float currentCellState = srcGrid.state[currentCellIndex];
 
     // Make sure to copy the current data before updating it
