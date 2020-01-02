@@ -1,13 +1,14 @@
-import shaderCompilerModule from './ShaderCompiler.js'
-import vertexShaderGLSL from './vertex_shader.js'
-import fragmentShader from './fragment_shader.js'
+import { displayAverageTime }   from './InteractionHandler.js'
+import fragmentShader           from './fragment_shader.js'
+import shaderCompilerModule     from './ShaderCompiler.js'
+import vertexShaderGLSL         from './vertex_shader.js'
 
-import computeShader0 from './compute1d.js'
-import computeShader1 from './compute1d_multipleThreads_1d.js'
-import computeShader2 from './compute1d_multipleThreads_2d.js'
-import computeShader3 from './compute2d.js'
-import computeShader4 from './compute2d_multipleThreads_1d.js'
-import computeShader5 from './compute2d_multipleThreads_2d.js'
+import computeShader0           from './compute1d.js'
+import computeShader1           from './compute1d_multipleThreads_1d.js'
+import computeShader2           from './compute1d_multipleThreads_2d.js'
+import computeShader3           from './compute2d.js'
+import computeShader4           from './compute2d_multipleThreads_1d.js'
+import computeShader5           from './compute2d_multipleThreads_2d.js'
 
 const computeShaders = [computeShader0, computeShader1, computeShader2, computeShader3, computeShader4, computeShader5];
 
@@ -15,7 +16,6 @@ const computeMode = 4;
 const gridSize = 49;
 const threadsPerGroup = 64;
 const threadsPerDirectionXY = Math.sqrt(threadsPerGroup); 
-const slowMode = false;
 
 const dispatchX = [
     gridSize * gridSize, 
@@ -34,6 +34,11 @@ const dispatchY = [
     Math.ceil(gridSize / threadsPerDirectionXY),
     Math.ceil(gridSize / threadsPerDirectionXY)
 ];
+
+let slowMode = false;
+let slowModeFrameTime = 500;
+let averageFrameTime = 0;
+let frameCount = 0;
 
 (async () => {
 
@@ -208,26 +213,24 @@ const dispatchY = [
         }]
     };
 
-    let iteration = 0;
-    let averageTime = 0;
     let previousTime = 0;
     async function frame(iTimeStamp) {
 
         // Early out in slow mode
         if( slowMode === true ){
-            if(iTimeStamp - previousTime < 500){
+            if(iTimeStamp - previousTime < slowModeFrameTime){
                 requestAnimationFrame(frame);
                 return;
             }
         }else{
             // Forget about the first 10 operations
-            if(iteration === 10){
-                averageTime = iTimeStamp - previousTime;
+            if(frameCount === 20){
+                averageFrameTime = iTimeStamp - previousTime;
             }else{
-                const averageTimeFactor = (iteration - 1) / iteration;
-                averageTime = averageTime * averageTimeFactor + (iTimeStamp - previousTime) * (1 - averageTimeFactor);
+                const averageFrameTimeFactor = (frameCount - 1) / frameCount;
+                averageFrameTime = averageFrameTime * averageFrameTimeFactor + (iTimeStamp - previousTime) * (1 - averageFrameTimeFactor);
             }
-            console.log(averageTime);
+            displayAverageTime(averageFrameTime);
         }
 
         previousTime = iTimeStamp;
@@ -239,23 +242,40 @@ const dispatchY = [
         // Compute pass
         const computePassEncoder = commandEncoder.beginComputePass();
         computePassEncoder.setPipeline(computePipeline);
-        computePassEncoder.setBindGroup(0, computeBindGroups[iteration % 2]);
+        computePassEncoder.setBindGroup(0, computeBindGroups[frameCount % 2]);
         computePassEncoder.dispatch(dispatchX[computeMode], dispatchY[computeMode]);
         computePassEncoder.endPass();
 
         // Render pass
         const renderPassEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
         renderPassEncoder.setPipeline(renderPipeline);
-        renderPassEncoder.setBindGroup(0, renderBindGroups[iteration % 2]);
+        renderPassEncoder.setBindGroup(0, renderBindGroups[frameCount % 2]);
         renderPassEncoder.draw(3, 1, 0, 0);
         renderPassEncoder.endPass();
 
         // Submit commands to the GPU
         device.defaultQueue.submit([commandEncoder.finish()]);
-        iteration++;
+        frameCount++;
 
         requestAnimationFrame(frame);
     }
 
     requestAnimationFrame(frame);
 })();
+
+
+// UI related stuff
+
+export function resetAverageFrameTime(){
+    averageFrameTime = 0;
+    frameCount = frameCount % 2;
+}
+
+export function slowModeChanged(isActivated){
+    slowMode = isActivated;
+    resetAverageFrameTime();
+}
+
+export function setSlowModeFrameTime(iFrameTime){
+    slowModeFrameTime = iFrameTime;
+}

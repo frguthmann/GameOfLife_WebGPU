@@ -3,15 +3,45 @@
 	<head>
 		<meta charset="utf-8">
 		<title>WebGPU Experiments</title>
+		<script type="module" src="./InteractionHandler.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix.js"></script>
 		<script type="module" src="game_of_life.js"></script>
+		<link rel = "stylesheet" type = "text/css" href = "style.css" />
 	</head>
 
 	<body style="background-color: rgb(128, 128, 128);">
-		<canvas id="webGPUCanvas" width="601" height="601">
-			Your browser doesn't appear to support the 
-			<code>&lt;canvas&gt;</code> element.
-		</canvas>
+
+		<div class="row">
+
+			<div class="columnLeft">
+				<div>
+
+					<p class="buttonLegend">Average Time: </p>
+					<p id="averageTime" class="buttonLegend"></p><br>
+
+					<label class="switch">
+						<input type="checkbox" id="slowModeToggle">
+						<span class="slider round"></span>
+					</label>
+					
+					<p class="buttonLegend">Slow Mode</p>
+					<div id="frameTimeDiv" style="display:none;">
+						<input type="number" value="500" min="16" max="5000" id="frameTimeInput">
+						<p class="buttonLegend">ms per frame</p>
+					</div>
+						
+				</div>
+			</div>
+			
+			<div class="columnRight">
+				<canvas id="webGPUCanvas" width="601" height="601">
+					Your browser doesn't appear to support the 
+					<code>&lt;canvas&gt;</code> element.
+				</canvas>
+			</div>
+
+		</div>
+
 	</body>
 
 </html>

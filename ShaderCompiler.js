@@ -1,7 +1,7 @@
 import glslangModule from 'https://unpkg.com/@webgpu/glslang@0.0.8/dist/web-devel/glslang.js';
 
-function addLineNumbers(string) {
-    var lines = string.split('\n');
+function addLineNumbers(iString) {
+    var lines = iString.split('\n');
     for (var i = 0; i < lines.length; i++) {
         lines[i] = (i + 1) + ': ' + lines[i];
     }

@@ -8,7 +8,7 @@ const fragmentShader = `
         float state[CELLS_COUNT];
     } grid;
 
-    const vec4 gridColor = vec4( 1.0, 0.0, 1.0, 1.0);
+    const vec4 gridColor = vec4( 0.13, 0.588, 0.95, 1.0);
 
     void main() {
 
