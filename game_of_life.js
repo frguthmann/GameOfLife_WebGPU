@@ -1,14 +1,14 @@
 import { displayAverageTime }   from './InteractionHandler.js'
-import fragmentShader           from './fragment_shader.js'
+import fragmentShader           from './shaders/fragment_shader.js'
 import shaderCompilerModule     from './ShaderCompiler.js'
-import vertexShaderGLSL         from './vertex_shader.js'
+import vertexShaderGLSL         from './shaders/vertex_shader.js'
 
-import computeShader0           from './compute1d.js'
-import computeShader1           from './compute1d_multipleThreads_1d.js'
-import computeShader2           from './compute1d_multipleThreads_2d.js'
-import computeShader3           from './compute2d.js'
-import computeShader4           from './compute2d_multipleThreads_1d.js'
-import computeShader5           from './compute2d_multipleThreads_2d.js'
+import computeShader0           from './shaders/compute1d.js'
+import computeShader1           from './shaders/compute1d_multipleThreads_1d.js'
+import computeShader2           from './shaders/compute1d_multipleThreads_2d.js'
+import computeShader3           from './shaders/compute2d.js'
+import computeShader4           from './shaders/compute2d_multipleThreads_1d.js'
+import computeShader5           from './shaders/compute2d_multipleThreads_2d.js'
 
 const computeShaders = [computeShader0, computeShader1, computeShader2, computeShader3, computeShader4, computeShader5];
 
