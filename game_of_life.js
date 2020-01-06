@@ -10,12 +10,26 @@ import computeShader3           from './shaders/compute2d.js'
 import computeShader4           from './shaders/compute2d_multipleThreads_1d.js'
 import computeShader5           from './shaders/compute2d_multipleThreads_2d.js'
 
-const computeShaders = [computeShader0, computeShader1, computeShader2, computeShader3, computeShader4, computeShader5];
+const computeShaders = [computeShader0, computeShader1, computeShader2, computeShader3, 
+    computeShader4, computeShader5];
 
-const computeMode = 4;
-const gridSize = 49;
+let computePipelines = [];
+let compileShader;
+let device;
+let computePipelineLayout;
+
+let gridSize = 512;
+const url = new URL(window.location.href);
+const gridSizeParameter = url.searchParams.get("grid_size");
+if(parseInt(gridSizeParameter)){
+    gridSize = gridSizeParameter
+}
+
+const cellsCount = gridSize * gridSize;
 const threadsPerGroup = 64;
 const threadsPerDirectionXY = Math.sqrt(threadsPerGroup); 
+const canvas = document.getElementById("webGPUCanvas");
+const scaleFactor = Math.ceil((canvas.width - 1) / gridSize);
 
 const dispatchX = [
     gridSize * gridSize, 
@@ -35,6 +49,7 @@ const dispatchY = [
     Math.ceil(gridSize / threadsPerDirectionXY)
 ];
 
+let computeMode = 4;
 let slowMode = false;
 let slowModeFrameTime = 500;
 let averageFrameTime = 0;
@@ -45,38 +60,18 @@ let frameCount = 0;
     if (!navigator.gpu) {
         alert('WebGPU not supported! To see this content, you must use Chrome Canary and enable this UNSAFE flag: chrome://flags/#enable-unsafe-webgpu');
     }
-
-    const canvas = document.getElementById("webGPUCanvas");
-    const cellsCount  = gridSize * gridSize;
  
     /*const density = ( canvas.width - 1)  / gridSize;
     if(density < 3.0){
         canvas.width = canvas.height = ( 3.0 * gridSize) + 1;
     }*/
 
-    const scaleFactor = Math.floor( (canvas.width - 1) / gridSize);
-
-    const globalDefines = 
-        "#version 450\n" +
-        "#define CELLS_COUNT "      + cellsCount  + "\n" +
-        "#define GRID_SIZE "        + gridSize    + "\n" + 
-        "#define PIXELS_PER_CELL "  + scaleFactor + "\n";
-
-    const fragmentShaderGLSL = globalDefines + fragmentShader;
-
-    const computeDefines = 
-        "#define DISPATCH_X "          + dispatchX[computeMode]       + "\n" +
-        "#define DISPATCH_Y "          + dispatchY[computeMode]       + "\n" +
-        "#define THREADS_PER_GROUP "   + threadsPerGroup       + "\n" + 
-        "#define THREADS_PER_GROUP_X " + threadsPerDirectionXY + "\n" + 
-        "#define THREADS_PER_GROUP_Y " + threadsPerDirectionXY + "\n"; 
-
-    const computeShaderGLSL = globalDefines + computeDefines + computeShaders[computeMode];
+    const fragmentShaderGLSL = getGlobalDefines() + fragmentShader;
 
     const adapter = await navigator.gpu.requestAdapter();
-    const device = await adapter.requestDevice();
+    device = await adapter.requestDevice();
     const ShaderCompiler = await shaderCompilerModule();
-    const compileShader = ShaderCompiler.compileShader;
+    compileShader = ShaderCompiler.compileShader;
 
     const context = canvas.getContext('gpupresent');
 
@@ -89,19 +84,12 @@ let frameCount = 0;
         ],
     });
 
-    const computePipelineLayout = device.createPipelineLayout({
+    computePipelineLayout = device.createPipelineLayout({
         bindGroupLayouts: [computeBindGroupLayout]
     });
 
-    const computePipeline = device.createComputePipeline({
-        layout: computePipelineLayout,
-        computeStage: {
-            module: device.createShaderModule({
-                code: compileShader(computeShaderGLSL, "compute"),
-            }),
-            entryPoint: "main"
-        },
-    });
+    computePipelines[computeMode] = createPipelineFromShader(device, computePipelineLayout, 
+        computeShaders[computeMode], "compute");
 
     const initialGridState = new Float32Array(gridSize * gridSize);
     initialGridState[gridSize * 0 + 1] = 1;
@@ -241,7 +229,7 @@ let frameCount = 0;
 
         // Compute pass
         const computePassEncoder = commandEncoder.beginComputePass();
-        computePassEncoder.setPipeline(computePipeline);
+        computePassEncoder.setPipeline(computePipelines[computeMode]);
         computePassEncoder.setBindGroup(0, computeBindGroups[frameCount % 2]);
         computePassEncoder.dispatch(dispatchX[computeMode], dispatchY[computeMode]);
         computePassEncoder.endPass();
@@ -263,6 +251,40 @@ let frameCount = 0;
     requestAnimationFrame(frame);
 })();
 
+function getGlobalDefines(){
+    let globalDefines = 
+        "#version 450\n" +
+        "#define CELLS_COUNT "      + cellsCount    + "\n" +
+        "#define GRID_SIZE "        + gridSize      + "\n" + 
+        "#define PIXELS_PER_CELL "  + scaleFactor   + "\n";
+    if( gridSize <= 512){
+        globalDefines += "#define HAS_GRID\n";
+    }
+    return globalDefines;
+}
+
+function getComputeDefines(iCaseNumber){
+    const computeDefines = 
+        "#define DISPATCH_X "          + dispatchX[iCaseNumber] + "\n" +
+        "#define DISPATCH_Y "          + dispatchY[iCaseNumber] + "\n" +
+        "#define THREADS_PER_GROUP "   + threadsPerGroup        + "\n" + 
+        "#define THREADS_PER_GROUP_X " + threadsPerDirectionXY  + "\n" + 
+        "#define THREADS_PER_GROUP_Y " + threadsPerDirectionXY  + "\n";
+    return computeDefines;
+}
+
+function createPipelineFromShader(iDevice, iLayout, iShader, iType){
+    const computeShaderGLSL = getGlobalDefines() + getComputeDefines(computeMode) + iShader;
+    return iDevice.createComputePipeline({
+        layout: iLayout,
+        computeStage: {
+            module: iDevice.createShaderModule({
+                code: compileShader(computeShaderGLSL, iType),
+            }),
+            entryPoint: "main"
+        },
+    });
+}
 
 // UI related stuff
 
@@ -278,4 +300,13 @@ export function slowModeChanged(isActivated){
 
 export function setSlowModeFrameTime(iFrameTime){
     slowModeFrameTime = iFrameTime;
+}
+
+export function changeTestCase(iCaseNumber){
+    computeMode = iCaseNumber;
+    if(!computePipelines[computeMode]){
+        computePipelines[computeMode] = createPipelineFromShader(device, computePipelineLayout, 
+            computeShaders[computeMode], 'compute');
+    }
+    resetAverageFrameTime();
 }

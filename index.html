@@ -16,19 +16,28 @@
 			<div class="columnLeft">
 				<div>
 
-					<p class="buttonLegend">Average Time: </p>
-					<p id="averageTime" class="buttonLegend"></p><br>
+					<p class="legend">Average Time </p>
+					<p id="averageTime" class="legend"></p><br>
 
-					<label class="switch">
-						<input type="checkbox" id="slowModeToggle">
-						<span class="slider round"></span>
-					</label>
+
+					<p class="legend">Slow Mode</p>
+					<input type="checkbox" id="slowModeToggle" class="checkbox">
 					
-					<p class="buttonLegend">Slow Mode</p>
 					<div id="frameTimeDiv" style="display:none;">
 						<input type="number" value="500" min="16" max="5000" id="frameTimeInput">
-						<p class="buttonLegend">ms per frame</p>
+						<p class="legend">ms per frame</p>
 					</div>
+
+					<br><br>
+					<p class="legend">Test Case </p>
+					<select name="Test cases" id="testSelector">
+					    <option value=0>Dispatch 1D</option>
+					    <option value=1>Dispatch 1D, ThreadGroup 1D</option>
+					    <option value=2>Dispatch 1D, ThreadGroup 2D</option>
+					    <option value=3>Dispatch 2D</option>
+					    <option value=4>Dispatch 2D, ThreadGroup 1D</option>
+					    <option value=5>Dispatch 2D, ThreadGroup 2D</option>
+					</select>
 						
 				</div>
 			</div>
