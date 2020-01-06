@@ -18,7 +18,7 @@ let compileShader;
 let device;
 let computePipelineLayout;
 
-let gridSize = 512;
+let gridSize = 64;
 const url = new URL(window.location.href);
 const gridSizeParameter = url.searchParams.get("grid_size");
 if(parseInt(gridSizeParameter)){
