@@ -29,11 +29,8 @@ if( parseInt( gridSizeParameter ) )
     gridSize = gridSizeParameter
 }
 
-let cellsCount, scaleFactor;
+let cellsCount, scaleFactor, dispatchX, dispatchY;
 updateGridConstants( gridSize );
-
-let dispatchX = generateDispatchX( gridSize, threadsPerGroup );
-let dispatchY = generateDispatchY( gridSize, threadsPerGroup );
 
 let computeMode = 4;
 let slowMode = false;
@@ -331,6 +328,8 @@ function updateGridConstants( iGridSize )
 {
     cellsCount = iGridSize * iGridSize;
     scaleFactor = Math.floor( ( canvas.width - 1 ) / iGridSize );
+    dispatchX = generateDispatchX( gridSize, threadsPerGroup );
+    dispatchY = generateDispatchY( gridSize, threadsPerGroup );
 }
 
 function rebuildPipelines( iGridSize )
