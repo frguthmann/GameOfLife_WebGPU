@@ -1,7 +1,6 @@
 # WebGPU Game of Life
 
-Live here: https://frguthmann.github.io/GameOfLife_WebGPU/?grid_size=64
-PS: You can modify the url to test different grid sizes.
+Live here: https://frguthmann.github.io/GameOfLife_WebGPU/?grid_size=64. You can modify the url to test different grid sizes.
 
 A simple experiment using WebGPU. The entire logic for the game is handled inside a compute shader, the CPU simply asks the GPU to swap buffers.
 

@@ -13,41 +13,27 @@ import computeShader5           from './shaders/compute2d_multipleThreads_2d.js'
 const computeShaders = [computeShader0, computeShader1, computeShader2, computeShader3, 
     computeShader4, computeShader5];
 
-let computePipelines = [];
+const swapChainFormat = "bgra8unorm"
+const threadsPerGroup = 64;
+const threadsPerDirectionXY = Math.sqrt(threadsPerGroup); 
+const canvas = document.getElementById("webGPUCanvas");
+
 let compileShader;
 let device;
-let computePipelineLayout;
 
 let gridSize = 64;
 const url = new URL(window.location.href);
 const gridSizeParameter = url.searchParams.get("grid_size");
-if(parseInt(gridSizeParameter)){
+if( parseInt( gridSizeParameter ) )
+{
     gridSize = gridSizeParameter
 }
 
-const cellsCount = gridSize * gridSize;
-const threadsPerGroup = 64;
-const threadsPerDirectionXY = Math.sqrt(threadsPerGroup); 
-const canvas = document.getElementById("webGPUCanvas");
-const scaleFactor = Math.ceil((canvas.width - 1) / gridSize);
+let cellsCount, scaleFactor;
+updateGridConstants( gridSize );
 
-const dispatchX = [
-    gridSize * gridSize, 
-    Math.ceil(gridSize * gridSize / threadsPerGroup), 
-    Math.ceil(gridSize * gridSize / threadsPerGroup),
-    gridSize,
-    Math.ceil(gridSize / threadsPerDirectionXY),
-    Math.ceil(gridSize / threadsPerDirectionXY)
-];
-
-const dispatchY = [
-    1, 
-    1, 
-    1,
-    gridSize,
-    Math.ceil(gridSize / threadsPerDirectionXY),
-    Math.ceil(gridSize / threadsPerDirectionXY)
-];
+let dispatchX = generateDispatchX( gridSize, threadsPerGroup );
+let dispatchY = generateDispatchY( gridSize, threadsPerGroup );
 
 let computeMode = 4;
 let slowMode = false;
@@ -55,18 +41,15 @@ let slowModeFrameTime = 500;
 let averageFrameTime = 0;
 let frameCount = 0;
 
+let computePipelines = [];
+let computeBindGroupLayout, computeBindGroups, computePipelineLayout;
+let renderBindGroupLayout, renderBindGroups, renderPipelineLayout, renderPipeline;
+
 (async () => {
 
     if (!navigator.gpu) {
         alert('WebGPU not supported! To see this content, you must use Chrome Canary and enable this UNSAFE flag: chrome://flags/#enable-unsafe-webgpu');
     }
- 
-    /*const density = ( canvas.width - 1)  / gridSize;
-    if(density < 3.0){
-        canvas.width = canvas.height = ( 3.0 * gridSize) + 1;
-    }*/
-
-    const fragmentShaderGLSL = getGlobalDefines() + fragmentShader;
 
     const adapter = await navigator.gpu.requestAdapter();
     device = await adapter.requestDevice();
@@ -77,7 +60,7 @@ let frameCount = 0;
 
     // COMPUTE PIPELINE SETUP
 
-    const computeBindGroupLayout = device.createBindGroupLayout({
+    computeBindGroupLayout = device.createBindGroupLayout({
         bindings: [
             { binding: 0, visibility: GPUShaderStage.COMPUTE, type: "storage-buffer" },
             { binding: 1, visibility: GPUShaderStage.COMPUTE, type: "storage-buffer" }
@@ -88,107 +71,35 @@ let frameCount = 0;
         bindGroupLayouts: [computeBindGroupLayout]
     });
 
-    computePipelines[computeMode] = createPipelineFromShader(device, computePipelineLayout, 
-        computeShaders[computeMode], "compute");
-
-    const initialGridState = new Float32Array(gridSize * gridSize);
-    initialGridState[gridSize * 0 + 1] = 1;
-    initialGridState[gridSize * 1 + 2] = 1;
-    initialGridState[gridSize * 2 + 0] = 1;
-    initialGridState[gridSize * 2 + 1] = 1;
-    initialGridState[gridSize * 2 + 2] = 1;
-
-    const cellBuffers = new Array(2);
-    for (let i = 0; i < 2; ++i) {
-
-        const [gpuBuffer, cpuArrayBuffer] = device.createBufferMapped({
-            size: initialGridState.byteLength,
-            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
-        });
-        new Float32Array(cpuArrayBuffer).set(initialGridState);
-        gpuBuffer.unmap();
-
-        cellBuffers[i] = gpuBuffer;
-    }
-
-    const computeBindGroups = new Array(2);
-    for (let i = 0; i < 2; ++i) {
-        computeBindGroups[i] = device.createBindGroup({
-            layout: computeBindGroupLayout,
-            bindings: [{
-                binding: 0,
-                resource: {
-                    buffer: cellBuffers[i],
-                    offset: 0,
-                    size: initialGridState.byteLength
-                },
-            }, {
-                binding: 1,
-                resource: {
-                    buffer: cellBuffers[ (i + 1) % 2],
-                    offset: 0,
-                    size: initialGridState.byteLength,
-                },
-            }]
-        });
-    }
+    computePipelines[ computeMode ] = createComputePipelineFromShader( device, computePipelineLayout, 
+        computeShaders[ computeMode ] );
+    const initialGridState = generateInitialGridState( gridSize );
+    const cellBuffers = generateCellBuffers( initialGridState );
+    computeBindGroups = generateComputeBindGroups( device, computeBindGroupLayout, cellBuffers, 
+        initialGridState );
 
     // RENDER PIPELINE SETUP
-
-    const swapChainFormat = "bgra8unorm"
 
     const swapChain = context.configureSwapChain({
         device,
         format: swapChainFormat
     });
 
-    const renderBindGroupLayout = device.createBindGroupLayout({
+    renderBindGroupLayout = device.createBindGroupLayout({
         bindings: [
             { binding: 0, visibility: GPUShaderStage.FRAGMENT, type: "storage-buffer" }
         ],
     });
 
-    const renderPipelineLayout = device.createPipelineLayout({
+    renderPipelineLayout = device.createPipelineLayout({
         bindGroupLayouts: [renderBindGroupLayout]
     });
 
-    const renderPipeline = device.createRenderPipeline({
-        layout: renderPipelineLayout,
+    const fragmentShaderGLSL = getGlobalDefines() + fragmentShader;
+    renderPipeline = createRenderPipelineFromShaders( device, renderPipelineLayout, vertexShaderGLSL,
+        fragmentShaderGLSL, swapChainFormat );
 
-        vertexStage: {
-            module: device.createShaderModule({
-                code: compileShader(vertexShaderGLSL, "vertex"),
-            }),
-            entryPoint: "main"
-        },
-        fragmentStage: {
-            module: device.createShaderModule({
-                code: compileShader(fragmentShaderGLSL, "fragment"),
-            }),
-            entryPoint: "main"
-        },
-
-        primitiveTopology: "triangle-list",
-
-        colorStates: [{
-            format: swapChainFormat,
-        }],
-    });
-
-    const renderBindGroups = new Array(2);
-    for (let i = 0; i < 2; ++i) {
-        renderBindGroups[i] = device.createBindGroup({
-            layout: renderBindGroupLayout,
-            bindings: [{
-                binding: 0,
-                resource: {
-                    buffer: cellBuffers[i],
-                    offset: 0,
-                    size: initialGridState.byteLength
-                },
-            }]
-        });
-    }
+    renderBindGroups = generateRenderBindGroups( device, renderBindGroupLayout, cellBuffers, initialGridState);
 
     const renderPassDescriptor = {
         colorAttachments: [{
@@ -218,7 +129,7 @@ let frameCount = 0;
                 const averageFrameTimeFactor = (frameCount - 1) / frameCount;
                 averageFrameTime = averageFrameTime * averageFrameTimeFactor + (iTimeStamp - previousTime) * (1 - averageFrameTimeFactor);
             }
-            displayAverageTime(averageFrameTime);
+            displayAverageTime( averageFrameTime );
         }
 
         previousTime = iTimeStamp;
@@ -251,6 +162,108 @@ let frameCount = 0;
     requestAnimationFrame(frame);
 })();
 
+function generateDispatchX( iGridSize, iThreadPerGroup ){
+    var threadsPerDirection = Math.sqrt( iThreadPerGroup );
+    return [
+        iGridSize * iGridSize, 
+        Math.ceil(iGridSize * iGridSize / iThreadPerGroup), 
+        Math.ceil(iGridSize * iGridSize / iThreadPerGroup),
+        iGridSize,
+        Math.ceil(iGridSize / threadsPerDirection),
+        Math.ceil(iGridSize / threadsPerDirection)
+    ];
+}
+
+function generateDispatchY( iGridSize, iThreadPerGroup ){
+    var threadsPerDirection = Math.sqrt( iThreadPerGroup );
+    return [
+        1, 
+        1, 
+        1,
+        iGridSize,
+        Math.ceil(iGridSize / threadsPerDirectionXY),
+        Math.ceil(iGridSize / threadsPerDirectionXY)
+    ];
+}
+
+function generateInitialGridState( iGridSize )
+{
+    let initialGridState = new Float32Array( iGridSize * iGridSize );
+    initialGridState[iGridSize * 0 + 1] = 1;
+    initialGridState[iGridSize * 1 + 2] = 1;
+    initialGridState[iGridSize * 2 + 0] = 1;
+    initialGridState[iGridSize * 2 + 1] = 1;
+    initialGridState[iGridSize * 2 + 2] = 1;
+
+    return initialGridState;
+}
+
+function generateCellBuffers( iInitialGridState )
+{
+    const cellBuffers = new Array(2);
+    for (let i = 0; i < 2; ++i) {
+
+        const [gpuBuffer, cpuArrayBuffer] = device.createBufferMapped({
+            size: iInitialGridState.byteLength,
+            usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+        });
+        new Float32Array(cpuArrayBuffer).set( iInitialGridState );
+        gpuBuffer.unmap();
+
+        cellBuffers[i] = gpuBuffer;
+    }
+
+    return cellBuffers;
+}
+
+function generateComputeBindGroups( iDevice, iComputeBindGroupLayout, iCellBuffers, iInitialGridState  )
+{
+    const computeBindGroups = new Array(2);
+    for ( let i = 0; i < 2; ++i ) 
+    {
+        computeBindGroups[i] = iDevice.createBindGroup({
+            layout: iComputeBindGroupLayout,
+            bindings: [{
+                binding: 0,
+                resource: {
+                    buffer: iCellBuffers[i],
+                    offset: 0,
+                    size: iInitialGridState.byteLength
+                },
+            }, {
+                binding: 1,
+                resource: {
+                    buffer: iCellBuffers[ (i + 1) % 2],
+                    offset: 0,
+                    size: iInitialGridState.byteLength,
+                },
+            }]
+        });
+    }
+
+    return computeBindGroups;
+}
+
+function generateRenderBindGroups( iDevice, iRenderBindGroupLayout, iCellBuffers, iInitialGridState )
+{
+    const renderBindGroups = new Array( 2 );
+    for ( let i = 0; i < 2; ++i ) {
+        renderBindGroups[i] = iDevice.createBindGroup({
+            layout: iRenderBindGroupLayout,
+            bindings: [{
+                binding: 0,
+                resource: {
+                    buffer: iCellBuffers[ i ],
+                    offset: 0,
+                    size: iInitialGridState.byteLength
+                },
+            }]
+        });
+    }
+
+    return renderBindGroups;
+}
+
 function getGlobalDefines(){
     let globalDefines = 
         "#version 450\n" +
@@ -263,7 +276,8 @@ function getGlobalDefines(){
     return globalDefines;
 }
 
-function getComputeDefines(iCaseNumber){
+function getComputeDefines( iCaseNumber )
+{
     const computeDefines = 
         "#define DISPATCH_X "          + dispatchX[iCaseNumber] + "\n" +
         "#define DISPATCH_Y "          + dispatchY[iCaseNumber] + "\n" +
@@ -273,40 +287,106 @@ function getComputeDefines(iCaseNumber){
     return computeDefines;
 }
 
-function createPipelineFromShader(iDevice, iLayout, iShader, iType){
-    const computeShaderGLSL = getGlobalDefines() + getComputeDefines(computeMode) + iShader;
+function createComputePipelineFromShader( iDevice, iLayout, iShader )
+{
+    const computeShaderGLSL = getGlobalDefines() + getComputeDefines( computeMode ) + iShader;
     return iDevice.createComputePipeline({
         layout: iLayout,
         computeStage: {
             module: iDevice.createShaderModule({
-                code: compileShader(computeShaderGLSL, iType),
+                code: compileShader( computeShaderGLSL, "compute" ),
             }),
             entryPoint: "main"
         },
     });
 }
 
+function createRenderPipelineFromShaders( iDevice, iRenderPipelineLayout, iVSCode, iFSCode, iSwapChainFormat )
+{
+    return iDevice.createRenderPipeline({
+        layout: iRenderPipelineLayout,
+
+        vertexStage: {
+            module: iDevice.createShaderModule({
+                code: compileShader( iVSCode, "vertex" ),
+            }),
+            entryPoint: "main"
+        },
+        fragmentStage: {
+            module: iDevice.createShaderModule({
+                code: compileShader( iFSCode, "fragment" ),
+            }),
+            entryPoint: "main"
+        },
+
+        primitiveTopology: "triangle-list",
+
+        colorStates: [{
+            format: iSwapChainFormat,
+        }],
+    });
+}
+
+function updateGridConstants( iGridSize )
+{
+    cellsCount = iGridSize * iGridSize;
+    scaleFactor = Math.floor( ( canvas.width - 1 ) / iGridSize );
+}
+
+function rebuildPipelines( iGridSize )
+{
+    const initialGridState = generateInitialGridState( iGridSize );
+    const cellBuffers = generateCellBuffers( initialGridState );
+    computeBindGroups = generateComputeBindGroups( device, computeBindGroupLayout, cellBuffers, 
+        initialGridState );
+    computePipelines[ computeMode ] = createComputePipelineFromShader( device, computePipelineLayout, 
+        computeShaders[ computeMode ] );
+
+    renderBindGroups = generateRenderBindGroups( device, renderBindGroupLayout, cellBuffers, 
+        initialGridState);
+    const fragmentShaderGLSL = getGlobalDefines() + fragmentShader;
+    renderPipeline = createRenderPipelineFromShaders( device, renderPipelineLayout, vertexShaderGLSL,
+        fragmentShaderGLSL, swapChainFormat );
+}
+
 // UI related stuff
 
-export function resetAverageFrameTime(){
+export function resetAverageFrameTime()
+{
     averageFrameTime = 0;
     frameCount = frameCount % 2;
 }
 
-export function slowModeChanged(isActivated){
+export function slowModeChanged( isActivated )
+{
     slowMode = isActivated;
     resetAverageFrameTime();
+    displayAverageTime( slowModeFrameTime );
 }
 
-export function setSlowModeFrameTime(iFrameTime){
+export function setSlowModeFrameTime( iFrameTime )
+{
     slowModeFrameTime = iFrameTime;
+    resetAverageFrameTime();
+    displayAverageTime( iFrameTime );
 }
 
-export function changeTestCase(iCaseNumber){
+export function changeTestCase( iCaseNumber )
+{
     computeMode = iCaseNumber;
-    if(!computePipelines[computeMode]){
-        computePipelines[computeMode] = createPipelineFromShader(device, computePipelineLayout, 
-            computeShaders[computeMode], 'compute');
+    if( !computePipelines[ computeMode ] )
+    {
+        computePipelines[ computeMode ] = createComputePipelineFromShader( device, computePipelineLayout, 
+            computeShaders[ computeMode ] );
     }
     resetAverageFrameTime();
 }
+
+export function changeGridSize( iGridSize )
+{
+    gridSize = iGridSize;
+    computePipelines = [];
+    updateGridConstants( iGridSize );
+    rebuildPipelines( iGridSize );
+    resetAverageFrameTime();
+}   
