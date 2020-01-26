@@ -8,22 +8,26 @@ const fragmentShader = `
         float state[CELLS_COUNT];
     } grid;
 
+    layout(set = 0, binding = 1) uniform Uniforms {
+        float pixelsPerCell;
+    } uniforms;
+
     const vec4 gridColor = vec4( 0.13, 0.588, 0.95, 1.0);
 
     void main() {
 
-        ivec2 screenCoord = ivec2( gl_FragCoord.xy / PIXELS_PER_CELL);
+        ivec2 screenCoord = ivec2( gl_FragCoord.xy / uniforms.pixelsPerCell );
 
         if( screenCoord.x < GRID_SIZE && screenCoord.y < GRID_SIZE ) 
         {
             #if defined(HAS_GRID)
-                if( gl_FragCoord.x - PIXELS_PER_CELL * screenCoord.x < 0.6 )
+                if( gl_FragCoord.x - uniforms.pixelsPerCell * screenCoord.x < 0.6 )
                 {
                     outColor = gridColor;
                     return;
                 }
 
-                if( gl_FragCoord.y - PIXELS_PER_CELL * screenCoord.y < 0.6 ) 
+                if( gl_FragCoord.y - uniforms.pixelsPerCell * screenCoord.y < 0.6 ) 
                 {
                     outColor = gridColor;
                     return;
@@ -35,7 +39,7 @@ const fragmentShader = `
             outColor = vec4(vec3(cellState), 1.0);
         }
         #if defined(HAS_GRID)
-        else if( gl_FragCoord.x <= GRID_SIZE * PIXELS_PER_CELL + 1.0 && gl_FragCoord.y <= GRID_SIZE * PIXELS_PER_CELL + 1.0 )
+        else if( gl_FragCoord.x <= GRID_SIZE * uniforms.pixelsPerCell + 1.0 && gl_FragCoord.y <= GRID_SIZE * uniforms.pixelsPerCell + 1.0 )
         {
             outColor = gridColor;
         }

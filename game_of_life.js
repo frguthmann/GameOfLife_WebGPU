@@ -1,4 +1,4 @@
-import { displayAverageTime }   from './InteractionHandler.js'
+import { displayAverageTime, updateUIInputFields } from './InteractionHandler.js'
 import fragmentShader           from './shaders/fragment_shader.js'
 import shaderCompilerModule     from './ShaderCompiler.js'
 import vertexShaderGLSL         from './shaders/vertex_shader.js'
@@ -22,6 +22,7 @@ let compileShader;
 let device;
 
 let gridSize = 64;
+let cellPixelSize = 15;
 const url = new URL(window.location.href);
 const gridSizeParameter = url.searchParams.get("grid_size");
 if( parseInt( gridSizeParameter ) )
@@ -29,8 +30,9 @@ if( parseInt( gridSizeParameter ) )
     gridSize = gridSizeParameter
 }
 
-let cellsCount, scaleFactor, dispatchX, dispatchY;
+let cellsCount, dispatchX, dispatchY;
 updateGridConstants( gridSize );
+updateUIInputFields( cellPixelSize, gridSize );
 
 let computeMode = 4;
 let slowMode = false;
@@ -41,11 +43,18 @@ let frameCount = 0;
 let computePipelines = [];
 let computeBindGroupLayout, computeBindGroups, computePipelineLayout;
 let renderBindGroupLayout, renderBindGroups, renderPipelineLayout, renderPipeline;
+let gpuUniformBuffer, gpuStagingUniformBuffer;
+const gpuUniformBufferSize = 4;
 
 (async () => {
 
     if (!navigator.gpu) {
         alert('WebGPU not supported! To see this content, you must use Chrome Canary and enable this UNSAFE flag: chrome://flags/#enable-unsafe-webgpu');
+    }
+
+    const density = ( canvas.width - 1)  / gridSize;
+    if(density < 3.0){
+        canvas.width = canvas.height = ( 3.0 * gridSize) + 1;
     }
 
     const adapter = await navigator.gpu.requestAdapter();
@@ -84,7 +93,8 @@ let renderBindGroupLayout, renderBindGroups, renderPipelineLayout, renderPipelin
 
     renderBindGroupLayout = device.createBindGroupLayout({
         bindings: [
-            { binding: 0, visibility: GPUShaderStage.FRAGMENT, type: "storage-buffer" }
+            { binding: 0, visibility: GPUShaderStage.FRAGMENT, type: "storage-buffer" },
+            { binding: 1, visibility: GPUShaderStage.FRAGMENT, type: "uniform-buffer" }
         ],
     });
 
@@ -95,6 +105,18 @@ let renderBindGroupLayout, renderBindGroups, renderPipelineLayout, renderPipelin
     const fragmentShaderGLSL = getGlobalDefines() + fragmentShader;
     renderPipeline = createRenderPipelineFromShaders( device, renderPipelineLayout, vertexShaderGLSL,
         fragmentShaderGLSL, swapChainFormat );
+
+    gpuStagingUniformBuffer = device.createBuffer({
+        size: gpuUniformBufferSize,
+        usage: GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC
+    });
+
+    gpuUniformBuffer = device.createBuffer({
+        size: gpuUniformBufferSize,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+    });
+
+    updateUniformBuffer( new Float32Array( [ cellPixelSize ] ) );
 
     renderBindGroups = generateRenderBindGroups( device, renderBindGroupLayout, cellBuffers, initialGridState);
 
@@ -247,14 +269,22 @@ function generateRenderBindGroups( iDevice, iRenderBindGroupLayout, iCellBuffers
     for ( let i = 0; i < 2; ++i ) {
         renderBindGroups[i] = iDevice.createBindGroup({
             layout: iRenderBindGroupLayout,
-            bindings: [{
-                binding: 0,
-                resource: {
-                    buffer: iCellBuffers[ i ],
-                    offset: 0,
-                    size: iInitialGridState.byteLength
+            bindings: [
+                {
+                    binding: 0,
+                    resource: {
+                        buffer: iCellBuffers[ i ],
+                        offset: 0,
+                        size: iInitialGridState.byteLength
+                    },
                 },
-            }]
+                {
+                    binding: 1,
+                    resource: {
+                        buffer: gpuUniformBuffer,
+                    },
+                }
+            ]
         });
     }
 
@@ -266,10 +296,10 @@ function getGlobalDefines(){
         "#version 450\n" +
         "#define CELLS_COUNT "      + cellsCount    + "\n" +
         "#define GRID_SIZE "        + gridSize      + "\n" + 
-        "#define PIXELS_PER_CELL "  + scaleFactor   + "\n";
-    if( gridSize <= 512){
+        "#define PIXELS_PER_CELL "  + cellPixelSize + "\n";
+    //if( gridSize <= 512){
         globalDefines += "#define HAS_GRID\n";
-    }
+    //}
     return globalDefines;
 }
 
@@ -326,8 +356,12 @@ function createRenderPipelineFromShaders( iDevice, iRenderPipelineLayout, iVSCod
 
 function updateGridConstants( iGridSize )
 {
+    var canvasPixelSize = gridSize * ( cellPixelSize ) + 1;
+    canvas.width  = canvasPixelSize;
+    canvas.height = canvasPixelSize;
+    canvas.style.height = canvasPixelSize + "px";
+    canvas.style.width  = canvasPixelSize + "px";
     cellsCount = iGridSize * iGridSize;
-    scaleFactor = Math.floor( ( canvas.width - 1 ) / iGridSize );
     dispatchX = generateDispatchX( gridSize, threadsPerGroup );
     dispatchY = generateDispatchY( gridSize, threadsPerGroup );
 }
@@ -346,6 +380,29 @@ function rebuildPipelines( iGridSize )
     const fragmentShaderGLSL = getGlobalDefines() + fragmentShader;
     renderPipeline = createRenderPipelineFromShaders( device, renderPipelineLayout, vertexShaderGLSL,
         fragmentShaderGLSL, swapChainFormat );
+}
+
+async function updateUniformBuffer( iFloat32Data )
+{
+    let stagingData;
+    try
+    {
+        stagingData = await gpuStagingUniformBuffer.mapWriteAsync();
+    } 
+    catch( iError )
+    {
+        console.log( iError );
+    } 
+    finally
+    {
+        new Float32Array( stagingData ).set( iFloat32Data );
+        gpuStagingUniformBuffer.unmap();
+        
+        // Copy from staging to real buffer
+        const commandEncoder = device.createCommandEncoder( {} );
+        commandEncoder.copyBufferToBuffer( gpuStagingUniformBuffer, 0, gpuUniformBuffer, 0, gpuUniformBufferSize );
+        device.defaultQueue.submit( [ commandEncoder.finish() ] );
+    }
 }
 
 // UI related stuff
@@ -389,3 +446,10 @@ export function changeGridSize( iGridSize )
     rebuildPipelines( iGridSize );
     resetAverageFrameTime();
 }   
+
+export async function changeCellSize( iCellSize )
+{
+    cellPixelSize = iCellSize;
+    updateGridConstants( gridSize );
+    updateUniformBuffer( new Float32Array( iCellSize ) );
+}

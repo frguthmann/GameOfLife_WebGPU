@@ -29,9 +29,12 @@
 					</div>
 					
 					<br>
-
+					
 					<p class="legend">Grid Size</p>
 					<input type="number" min="8" max="8192" id="gridSizeInput">
+
+					<p class="legend">Cell Size (px)</p>
+					<input type="number" min="1" max="100" id="cellSizeInput">
 
 					<br>
 
@@ -48,8 +51,8 @@
 				</div>
 			</div>
 			
-			<div class="columnRight">
-				<canvas id="webGPUCanvas" width="601" height="601">
+			<div class="columnRight" id="canvasView" style="width: 601px; height: 601px; overflow: hidden; padding: 0px;">
+				<canvas id="webGPUCanvas" width="601" height="601px" style="width: 601px; height: 601px;">
 					Your browser doesn't appear to support the 
 					<code>&lt;canvas&gt;</code> element.
 				</canvas>
