@@ -451,5 +451,5 @@ export async function changeCellSize( iCellSize )
 {
     cellPixelSize = iCellSize;
     updateGridConstants( gridSize );
-    updateUniformBuffer( new Float32Array( iCellSize ) );
+    updateUniformBuffer( new Float32Array( [ iCellSize ] ) );
 }

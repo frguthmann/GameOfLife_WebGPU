@@ -103,8 +103,6 @@ export function displayAverageTime( iAverageTime )
 
 export function updateUIInputFields( iCellSize, iGridSize )
 {
-	const gridSizeInput = document.getElementById( "gridSizeInput" );
-	const cellSizeInput = document.getElementById( "cellSizeInput" );
-	cellSizeInput.value = iCellSize;
-	gridSizeInput.value = iGridSize;
+	document.getElementById( "cellSizeInput" ).value = iCellSize;
+	document.getElementById( "gridSizeInput" ).value = iGridSize;
 }
