@@ -67,7 +67,7 @@ const gpuUniformBufferSize = 4;
     // COMPUTE PIPELINE SETUP
 
     computeBindGroupLayout = device.createBindGroupLayout({
-        bindings: [
+        entries: [
             { binding: 0, visibility: GPUShaderStage.COMPUTE, type: "storage-buffer" },
             { binding: 1, visibility: GPUShaderStage.COMPUTE, type: "storage-buffer" }
         ],
@@ -92,7 +92,7 @@ const gpuUniformBufferSize = 4;
     });
 
     renderBindGroupLayout = device.createBindGroupLayout({
-        bindings: [
+        entries: [
             { binding: 0, visibility: GPUShaderStage.FRAGMENT, type: "storage-buffer" },
             { binding: 1, visibility: GPUShaderStage.FRAGMENT, type: "uniform-buffer" }
         ],
@@ -242,7 +242,7 @@ function generateComputeBindGroups( iDevice, iComputeBindGroupLayout, iCellBuffe
     {
         computeBindGroups[i] = iDevice.createBindGroup({
             layout: iComputeBindGroupLayout,
-            bindings: [{
+            entries: [{
                 binding: 0,
                 resource: {
                     buffer: iCellBuffers[i],
@@ -269,7 +269,7 @@ function generateRenderBindGroups( iDevice, iRenderBindGroupLayout, iCellBuffers
     for ( let i = 0; i < 2; ++i ) {
         renderBindGroups[i] = iDevice.createBindGroup({
             layout: iRenderBindGroupLayout,
-            bindings: [
+            entries: [
                 {
                     binding: 0,
                     resource: {
