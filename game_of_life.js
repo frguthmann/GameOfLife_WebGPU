@@ -182,19 +182,17 @@ const gpuUniformBufferSize = 4;
 })();
 
 function generateDispatchX( iGridSize, iThreadPerGroup ){
-    var threadsPerDirection = Math.sqrt( iThreadPerGroup );
     return [
         iGridSize * iGridSize, 
         Math.ceil(iGridSize * iGridSize / iThreadPerGroup), 
         Math.ceil(iGridSize * iGridSize / iThreadPerGroup),
         iGridSize,
-        Math.ceil(iGridSize / threadsPerDirection),
-        Math.ceil(iGridSize / threadsPerDirection)
+        Math.ceil(iGridSize / threadsPerDirectionXY),
+        Math.ceil(iGridSize / threadsPerDirectionXY)
     ];
 }
 
 function generateDispatchY( iGridSize, iThreadPerGroup ){
-    var threadsPerDirection = Math.sqrt( iThreadPerGroup );
     return [
         1, 
         1, 
@@ -220,13 +218,16 @@ function generateInitialGridState( iGridSize )
 function generateCellBuffers( iInitialGridState )
 {
     const cellBuffers = new Array(2);
-    for (let i = 0; i < 2; ++i) {
-
-        const [gpuBuffer, cpuArrayBuffer] = device.createBufferMapped({
+    for (let i = 0; i < 2; ++i) 
+    {
+        const gpuBuffer = device.createBuffer({
+            mappedAtCreation: true,
             size: iInitialGridState.byteLength,
             usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
         });
-        new Float32Array(cpuArrayBuffer).set( iInitialGridState );
+        const cpuArrayBuffer = gpuBuffer.getMappedRange();
+        
+        new Float32Array( cpuArrayBuffer ).set( iInitialGridState );
         gpuBuffer.unmap();
 
         cellBuffers[i] = gpuBuffer;
@@ -387,7 +388,8 @@ async function updateUniformBuffer( iFloat32Data )
     let stagingData;
     try
     {
-        stagingData = await gpuStagingUniformBuffer.mapWriteAsync();
+        await gpuStagingUniformBuffer.mapAsync( GPUMapMode.WRITE );
+        stagingData = gpuStagingUniformBuffer.getMappedRange();
     } 
     catch( iError )
     {
