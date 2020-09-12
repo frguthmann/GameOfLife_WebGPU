@@ -1,4 +1,4 @@
-import { displayAverageTime, updateUIInputFields } from './InteractionHandler.js'
+import { displayAverageTime }   from './InteractionHandler.js'
 import fragmentShader           from './shaders/fragment_shader.js'
 import shaderCompilerModule     from './ShaderCompiler.js'
 import vertexShaderGLSL         from './shaders/vertex_shader.js'
@@ -21,7 +21,7 @@ const canvas = document.getElementById("webGPUCanvas");
 let compileShader;
 let device;
 
-let gridSize = 64;
+let gridSize = 32;
 let cellPixelSize = 15;
 const url = new URL(window.location.href);
 const gridSizeParameter = url.searchParams.get("grid_size");
@@ -32,13 +32,17 @@ if( parseInt( gridSizeParameter ) )
 
 let cellsCount, dispatchX, dispatchY;
 updateGridConstants( gridSize );
-updateUIInputFields( cellPixelSize, gridSize );
 
 let computeMode = 4;
-let slowMode = false;
-let slowModeFrameTime = 500;
+let simulationTimeStep = 16;
+let currentComputeBuffer = 0;
+
+let previousTime = 0;
+let previousSimulationTime = 0;
 let averageFrameTime = 0;
-let frameCount = 0;
+const frameTimesSize = 60;
+let frameTimes = new Array( frameTimesSize ).fill( 0 );
+let currentFrameTimeIndex = 0;
 
 let computePipelines = [];
 let computeBindGroupLayout, computeBindGroups, computePipelineLayout;
@@ -131,50 +135,43 @@ const gpuUniformBufferSize = 4;
         }]
     };
 
-    let previousTime = 0;
-    async function frame(iTimeStamp) {
-
-        // Early out in slow mode
-        if( slowMode === true ){
-            if(iTimeStamp - previousTime < slowModeFrameTime){
-                requestAnimationFrame(frame);
-                return;
-            }
-        }else{
-            // Forget about the first 10 operations
-            if(frameCount === 20){
-                averageFrameTime = iTimeStamp - previousTime;
-            }else{
-                const averageFrameTimeFactor = (frameCount - 1) / frameCount;
-                averageFrameTime = averageFrameTime * averageFrameTimeFactor + (iTimeStamp - previousTime) * (1 - averageFrameTimeFactor);
-            }
-            displayAverageTime( averageFrameTime );
-        }
-
+    async function frame( iTimeStamp )
+    {
+        // Rolling average frame time
+        const currentFrameTime = iTimeStamp - previousTime;
+        averageFrameTime += (currentFrameTime - frameTimes[currentFrameTimeIndex]) / frameTimesSize;
+        frameTimes[currentFrameTimeIndex] = currentFrameTime;
+        currentFrameTimeIndex = (currentFrameTimeIndex + 1) % frameTimesSize;
         previousTime = iTimeStamp;
+        displayAverageTime( averageFrameTime );
 
         // Get next available image view from swap chain
         renderPassDescriptor.colorAttachments[0].attachment = swapChain.getCurrentTexture().createView();
         const commandEncoder = device.createCommandEncoder({});
 
         // Compute pass
-        const computePassEncoder = commandEncoder.beginComputePass();
-        computePassEncoder.setPipeline(computePipelines[computeMode]);
-        computePassEncoder.setBindGroup(0, computeBindGroups[frameCount % 2]);
-        computePassEncoder.dispatch(dispatchX[computeMode], dispatchY[computeMode]);
-        computePassEncoder.endPass();
+        const timeSinceLastSimulation = iTimeStamp - previousSimulationTime;
+        if ( timeSinceLastSimulation > simulationTimeStep )
+        {
+            const computePassEncoder = commandEncoder.beginComputePass();
+            computePassEncoder.setPipeline(computePipelines[computeMode]);
+            computePassEncoder.setBindGroup(0, computeBindGroups[currentComputeBuffer]);
+            computePassEncoder.dispatch(dispatchX[computeMode], dispatchY[computeMode]);
+            computePassEncoder.endPass();
+
+            previousSimulationTime = iTimeStamp;
+            currentComputeBuffer = currentComputeBuffer > 0 ? 0 : 1;
+        }
 
         // Render pass
         const renderPassEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
         renderPassEncoder.setPipeline(renderPipeline);
-        renderPassEncoder.setBindGroup(0, renderBindGroups[frameCount % 2]);
+        renderPassEncoder.setBindGroup(0, renderBindGroups[currentComputeBuffer]);
         renderPassEncoder.draw(3, 1, 0, 0);
         renderPassEncoder.endPass();
 
         // Submit commands to the GPU
         device.defaultQueue.submit([commandEncoder.finish()]);
-        frameCount++;
-
         requestAnimationFrame(frame);
     }
 
@@ -358,10 +355,10 @@ function createRenderPipelineFromShaders( iDevice, iRenderPipelineLayout, iVSCod
 function updateGridConstants( iGridSize )
 {
     var canvasPixelSize = gridSize * ( cellPixelSize ) + 1;
-    canvas.width  = canvasPixelSize;
-    canvas.height = canvasPixelSize;
-    canvas.style.height = canvasPixelSize + "px";
-    canvas.style.width  = canvasPixelSize + "px";
+    canvas.width  = 601;
+    canvas.height = 601;
+    canvas.style.height = 601 + "px";
+    canvas.style.width  = 601 + "px";
     cellsCount = iGridSize * iGridSize;
     dispatchX = generateDispatchX( gridSize, threadsPerGroup );
     dispatchY = generateDispatchY( gridSize, threadsPerGroup );
@@ -407,26 +404,9 @@ async function updateUniformBuffer( iFloat32Data )
     }
 }
 
-// UI related stuff
-
-export function resetAverageFrameTime()
+export function setSimulationTimeStep( iFrameTime )
 {
-    averageFrameTime = 0;
-    frameCount = frameCount % 2;
-}
-
-export function slowModeChanged( isActivated )
-{
-    slowMode = isActivated;
-    resetAverageFrameTime();
-    displayAverageTime( slowModeFrameTime );
-}
-
-export function setSlowModeFrameTime( iFrameTime )
-{
-    slowModeFrameTime = iFrameTime;
-    resetAverageFrameTime();
-    displayAverageTime( iFrameTime );
+    simulationTimeStep = iFrameTime;
 }
 
 export function changeTestCase( iCaseNumber )
@@ -437,19 +417,17 @@ export function changeTestCase( iCaseNumber )
         computePipelines[ computeMode ] = createComputePipelineFromShader( device, computePipelineLayout, 
             computeShaders[ computeMode ] );
     }
-    resetAverageFrameTime();
 }
 
-export function changeGridSize( iGridSize )
+export function setGridSize( iGridSize )
 {
     gridSize = iGridSize;
     computePipelines = [];
     updateGridConstants( iGridSize );
     rebuildPipelines( iGridSize );
-    resetAverageFrameTime();
 }   
 
-export async function changeCellSize( iCellSize )
+export async function setCellSize( iCellSize )
 {
     cellPixelSize = iCellSize;
     updateGridConstants( gridSize );

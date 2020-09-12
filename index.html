@@ -4,7 +4,7 @@
 		<meta charset="utf-8">
 		<title>WebGPU Experiments</title>
 		<script type="module" src="./InteractionHandler.js"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix.js"></script>
+		<script type="text/javascript" src="ext/dat.gui.min.js"></script>
 		<script type="module" src="game_of_life.js"></script>
 		<link rel = "stylesheet" type = "text/css" href = "style.css" />
 	</head>
@@ -15,29 +15,6 @@
 
 			<div class="columnLeft">
 				<div>
-
-					<p class="legend">Average Time </p>
-					<p id="averageTime" class="legend"></p><br>
-
-
-					<p class="legend">Slow Mode</p>
-					<input type="checkbox" id="slowModeToggle" class="checkbox">
-					
-					<div id="frameTimeDiv" style="display:none;">
-						<input type="number" value="500" min="16" max="5000" id="frameTimeInput">
-						<p class="legend">ms per frame</p>
-					</div>
-					
-					<br>
-					
-					<p class="legend">Grid Size</p>
-					<input type="number" min="8" max="8192" id="gridSizeInput">
-
-					<p class="legend">Cell Size (px)</p>
-					<input type="number" min="1" max="100" id="cellSizeInput">
-
-					<br>
-
 					<p class="legend">Test Case </p>
 					<select name="Test cases" id="testSelector">
 					    <option value=0>Dispatch 1D</option>

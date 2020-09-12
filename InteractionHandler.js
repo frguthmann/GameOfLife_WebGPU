@@ -1,19 +1,11 @@
 import { 
-	slowModeChanged, 
-	setSlowModeFrameTime, 
-	resetAverageFrameTime, 
+	setSimulationTimeStep, 
 	changeTestCase, 
-	changeGridSize,
-	changeCellSize
+	setGridSize,
+	setCellSize
 } from "./game_of_life.js"
 
-const averageTimeText 	= document.getElementById( "averageTime" );
-const frameTimeInput 	= document.getElementById( "frameTimeInput" );
-const frameTimeDiv 	 	= document.getElementById( "frameTimeDiv" );
-const slowModeToggle 	= document.getElementById( "slowModeToggle" );
 const testSelector		= document.getElementById( "testSelector" );
-const gridSizeInput		= document.getElementById( "gridSizeInput" );
-const cellSizeInput		= document.getElementById( "cellSizeInput" );
 const canvas			= document.getElementById( "webGPUCanvas" );
 const canvasView		= document.getElementById( "canvasView" );
 
@@ -22,87 +14,45 @@ let dragging = false;
 let marginLeft = 0, marginTop = 0;
 let maxMarginLeft, maxMarginTop;
 
-window.addEventListener( "focus", resetAverageFrameTime, false );
+let guiData = {
+	averageFrameTime : 0,
+	simulationTimeStep : 16,
+	gridSize : 32,
+	cellSize : 15,
+};
 
-frameTimeInput.addEventListener( 'change', ( iEvent ) => 
-{
-	setSlowModeFrameTime( parseInt( iEvent.target.value ) );
-});
+const gui = new dat.GUI();
 
-slowModeToggle.addEventListener( 'change', ( iEvent ) => {
-	if( iEvent.target.checked )
-	{
-		frameTimeDiv.style.display = "inline-block";
-	}
-	else
-	{
-		frameTimeDiv.style.display = "none";
-	}
-	slowModeChanged( iEvent.target.checked );
-});
+// Display GUI
+const displayFolder = gui.addFolder( "Display" );
+displayFolder.add( guiData, "gridSize", 1 ).step( 1 ).name( "Grid Size" ).onChange( setGridSize );
+displayFolder.add( guiData, "cellSize", 1 ).step( 1 ).name( "Cell Size" ).onChange( setCellSize );
+displayFolder.open();
+
+// Simulation GUI
+
+const simulationFolder = gui.addFolder( "Simulation" );
+simulationFolder.add( guiData, "simulationTimeStep", 1 ).min(1).step( 1 ).name( "Time step " ).onChange( setSimulationTimeStep );
+simulationFolder.open();
+
+// Metrics GUI
+
+const metricsFolder = gui.addFolder( "Metrics" );
+let averageFrameTimeGUI = metricsFolder.add( guiData, "averageFrameTime" ).name("Frame Time");
+averageFrameTimeGUI.domElement.style.pointerEvents = "none"
+averageFrameTimeGUI.domElement.style.opacity = 0.5;
+metricsFolder.open();
 
 testSelector.addEventListener( 'change', ( iEvent ) => 
 {
 	changeTestCase( parseInt( iEvent.target.value ) );
 });
 
-gridSizeInput.addEventListener( 'change', ( iEvent ) => 
-{
-	changeGridSize( parseInt( iEvent.target.value ) );
-	resetMargins();
-});
-
-cellSizeInput.addEventListener( 'change', ( iEvent ) => 
-{
-	changeCellSize( parseInt( iEvent.target.value ) );
-	resetMargins();
-});
-
-canvas.addEventListener( 'mousedown', ( iEvent ) =>
-{
-    dragging = true;
-    lastX = iEvent.clientX;
-    lastY = iEvent.clientY;
-    iEvent.preventDefault();
-}, false);
-
-window.addEventListener( 'mousemove', ( iEvent) => 
-{
-    if (dragging) {
-        const deltaX = iEvent.clientX - lastX;
-        const deltaY = iEvent.clientY - lastY;
-        lastX = iEvent.clientX;
-        lastY = iEvent.clientY;
-        marginLeft = Math.max( maxMarginLeft, Math.min( marginLeft + deltaX, 0.0 ) );
-        marginTop  = Math.max( maxMarginTop,  Math.min( marginTop  + deltaY, 0.0 ) );
-        canvas.style.transform  = "translate(" + marginLeft + "px, "+ marginTop + "px)";
-    }
-    iEvent.preventDefault();
-}, false);
-
-window.addEventListener('mouseup', function() {
-    dragging = false;
-}, false);
-
-function resetMargins()
-{
-	maxMarginLeft = Math.min( 0.0, ( parseInt(canvasView.style.width)  -  parseInt( canvas.style.width )  ) );
-	maxMarginTop  = Math.min( 0.0, ( parseInt(canvasView.style.height) -  parseInt( canvas.style.height ) ) );
-	canvas.style.transform  = "translate(0px, 0px)";
-}
-
-resetMargins();
-
 export function displayAverageTime( iAverageTime )
 {
 	if( parseFloat( iAverageTime ) )
 	{
-		averageTimeText.textContent = iAverageTime.toFixed( 2 ) + " ms";
+		guiData.averageFrameTime = iAverageTime;
+		averageFrameTimeGUI.updateDisplay();
 	}
-}
-
-export function updateUIInputFields( iCellSize, iGridSize )
-{
-	document.getElementById( "cellSizeInput" ).value = iCellSize;
-	document.getElementById( "gridSizeInput" ).value = iGridSize;
 }
