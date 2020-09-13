@@ -39,7 +39,7 @@ computeFolder.open();
 
 // Display GUI
 const displayFolder = gui.addFolder( "Display" );
-displayFolder.add( guiData, "gridSize", 1 ).step( 1 ).name( "Grid Size" ).onChange( setGridSize );
+const gridSizeGUI = displayFolder.add( guiData, "gridSize", 1 ).step( 1 ).name( "Grid Size" ).onChange( setGridSize );
 const cellSizeGUI = displayFolder.add( guiData, "cellSize", 1 ).step( 1 ).name( "Cell Size" ).onChange( setCellSize );
 displayFolder.open();
 
@@ -68,8 +68,10 @@ export default async function()
 				averageFrameTimeGUI.updateDisplay();
 			}
 		},
-		updateUI: function displayAverageTime( iCellSize )
+		updateUI: function displayAverageTime( iGridSize, iCellSize )
 		{
+			guiData.gridSize = iGridSize;
+			gridSizeGUI.updateDisplay(); 
 			guiData.cellSize = iCellSize;
 			cellSizeGUI.updateDisplay();
 		}

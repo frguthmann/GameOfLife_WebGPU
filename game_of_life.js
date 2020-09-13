@@ -27,9 +27,11 @@ let gridSize = 32;
 let cellPixelSize = 15;
 const url = new URL( window.location.href );
 const gridSizeParameter = url.searchParams.get( "grid_size" );
-if ( parseInt( gridSizeParameter ) )
+
+const paramGridSize = parseInt( gridSizeParameter );
+if ( paramGridSize )
 {
-    gridSize = gridSizeParameter
+    gridSize = paramGridSize;
 }
 
 let cellsCount, dispatchX, dispatchY;
@@ -200,7 +202,7 @@ const gpuUniformBufferSize = 4;
     }
 
     InteractionHandler = await interactionHandlerPromise;
-    InteractionHandler.updateUI( cellPixelSize );
+    InteractionHandler.updateUI( gridSize, cellPixelSize );
     
     requestAnimationFrame( frame );
 } )();
@@ -464,10 +466,9 @@ export function changeTestCase( iCaseNumber )
 
 export function setGridSize( iGridSize )
 {
-    gridSize = iGridSize;
-    computePipelines = [];
-    updateGridConstants( iGridSize );
-    rebuildPipelines( iGridSize );
+    gridSize = parseInt( iGridSize );
+    updateGridConstants( gridSize );
+    rebuildPipelines( gridSize );
 }
 
 export async function setCellSize( iCellSize )
