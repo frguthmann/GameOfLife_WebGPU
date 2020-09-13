@@ -2,7 +2,7 @@
 
 	<head>
 		<meta charset="utf-8">
-		<title>WebGPU Experiments</title>
+		<title>WebGPU Game Of Life</title>
 		<script type="module" src="./InteractionHandler.js"></script>
 		<script type="text/javascript" src="ext/dat.gui.min.js"></script>
 		<script type="module" src="game_of_life.js"></script>
@@ -11,31 +11,10 @@
 
 	<body style="background-color: rgb(128, 128, 128);">
 
-		<div class="row">
-
-			<div class="columnLeft">
-				<div>
-					<p class="legend">Test Case </p>
-					<select name="Test cases" id="testSelector">
-					    <option value=0>Dispatch 1D</option>
-					    <option value=1>Dispatch 1D, ThreadGroup 1D</option>
-					    <option value=2>Dispatch 1D, ThreadGroup 2D</option>
-					    <option value=3>Dispatch 2D</option>
-					    <option value=4>Dispatch 2D, ThreadGroup 1D</option>
-					    <option value=5>Dispatch 2D, ThreadGroup 2D</option>
-					</select>
-						
-				</div>
-			</div>
-			
-			<div class="columnRight" id="canvasView" style="width: 601px; height: 601px; overflow: hidden; padding: 0px;">
-				<canvas id="webGPUCanvas" width="601" height="601px" style="width: 601px; height: 601px;">
-					Your browser doesn't appear to support the 
-					<code>&lt;canvas&gt;</code> element.
-				</canvas>
-			</div>
-
-		</div>
+		<canvas id="webGPUCanvas" width="481" height="481">
+			Your browser doesn't appear to support the 
+			<code>&lt;canvas&gt;</code> element.
+		</canvas>
 
 		<!-- Google Analytics -->
 		<script>
