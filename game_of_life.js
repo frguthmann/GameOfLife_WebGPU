@@ -201,6 +201,7 @@ const gpuUniformBufferSize = 4;
 
     InteractionHandler = await interactionHandlerPromise;
     InteractionHandler.updateUI( cellPixelSize );
+    
     requestAnimationFrame( frame );
 } )();
 
