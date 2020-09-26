@@ -22,56 +22,54 @@ let marginLeft = 0,
 	marginTop = 0;
 let maxMarginLeft, maxMarginTop;
 
-let guiData = {
+let gameData = {
 	averageFrameTime: 0,
 	simulationTimeStep: 16,
 	gridSize: 32,
-	cellSize: 15,
+	cellPixelSize: 15,
 	computePreset: 0,
 };
 
+let guis = [];
 const gui = new dat.GUI();
 
 // Compute GUI
 const computeFolder = gui.addFolder( "Compute" );
-computeFolder.add( guiData, "computePreset", computePresets ).name( "Preset" ).onChange( changeTestCase );
+computeFolder.add( gameData, "computePreset", computePresets ).name( "Preset" ).onChange( changeTestCase );
 computeFolder.open();
 
 // Display GUI
 const displayFolder = gui.addFolder( "Display" );
-displayFolder.add( guiData, "gridSize", 1 ).step( 1 ).name( "Grid Size" ).onChange( setGridSize );
-const cellSizeGUI = displayFolder.add( guiData, "cellSize", 1 ).step( 1 ).name( "Cell Size" ).onChange( setCellSize );
+displayFolder.add( gameData, "gridSize", 1 ).step( 1 ).name( "Grid Size" ).onChange( setGridSize );
+const cellSizeGUI = displayFolder.add( gameData, "cellPixelSize", 1 ).step( 1 ).name( "Cell Size" ).onChange( setCellSize );
+guis.push( cellSizeGUI );
 displayFolder.open();
 
 // Simulation GUI
 
 const simulationFolder = gui.addFolder( "Simulation" );
-simulationFolder.add( guiData, "simulationTimeStep", 1 ).min( 1 ).step( 1 ).name( "Time step " ).onChange( setSimulationTimeStep );
+simulationFolder.add( gameData, "simulationTimeStep", 1 ).min( 1 ).step( 1 ).name( "Time step " ).onChange( setSimulationTimeStep );
 simulationFolder.open();
 
 // Metrics GUI
 
 const metricsFolder = gui.addFolder( "Metrics" );
-let averageFrameTimeGUI = metricsFolder.add( guiData, "averageFrameTime" ).name( "Frame Time" );
+let averageFrameTimeGUI = metricsFolder.add( gameData, "averageFrameTime" ).name( "Frame Time" );
 averageFrameTimeGUI.domElement.style.pointerEvents = "none"
 averageFrameTimeGUI.domElement.style.opacity = 0.5;
+guis.push( averageFrameTimeGUI );
 metricsFolder.open();
 
 export default async function()
 {
 	return {
-		displayAverageTime: function displayAverageTime( iAverageTime )
+		updateUI: function displayAverageTime( iGameData )
 		{
-			if ( parseFloat( iAverageTime ) )
+			Object.assign(gameData, iGameData);
+			for( let guiIdx in guis )
 			{
-				guiData.averageFrameTime = iAverageTime;
-				averageFrameTimeGUI.updateDisplay();
+				guis[ guiIdx ].updateDisplay();
 			}
-		},
-		updateUI: function displayAverageTime( iCellSize )
-		{
-			guiData.cellSize = iCellSize;
-			cellSizeGUI.updateDisplay();
 		}
 	};
 };

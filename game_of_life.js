@@ -22,26 +22,30 @@ const threadsPerGroup = 64;
 const threadsPerDirectionXY = Math.sqrt( threadsPerGroup );
 const canvas = document.getElementById( "webGPUCanvas" );
 
+let gameData = {
+    averageFrameTime: 0,
+    simulationTimeStep: 16,
+    gridSize: 32,
+    cellPixelSize: 15,
+    computePreset: 0
+};
+
 let device;
-let gridSize = 32;
-let cellPixelSize = 15;
 const url = new URL( window.location.href );
 const gridSizeParameter = url.searchParams.get( "grid_size" );
 if ( parseInt( gridSizeParameter ) )
 {
-    gridSize = gridSizeParameter
+    gameData.gridSize = gridSizeParameter
 }
 
 let cellsCount, dispatchX, dispatchY;
-updateGridConstants( gridSize );
+updateGridConstants( gameData.gridSize );
 
 let computeMode = 4;
-let simulationTimeStep = 16;
 let currentComputeBuffer = 0;
 
 let previousTime = 0;
 let previousSimulationTime = 0;
-let averageFrameTime = 0;
 const frameTimesSize = 60;
 let frameTimes = new Array( frameTimesSize ).fill( 0 );
 let currentFrameTimeIndex = 0;
@@ -92,7 +96,7 @@ const gpuUniformBufferSize = 4;
     ShaderCompiler = await shaderCompilerPromise;
     computePipelines[ computeMode ] = createComputePipelineFromShader( device, computePipelineLayout,
         computeShaders[ computeMode ] );
-    const initialGridState = generateInitialGridState( gridSize );
+    const initialGridState = generateInitialGridState( gameData.gridSize );
     const cellBuffers = generateCellBuffers( initialGridState );
     computeBindGroups = generateComputeBindGroups( device, computeBindGroupLayout, cellBuffers,
         initialGridState );
@@ -141,7 +145,7 @@ const gpuUniformBufferSize = 4;
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     } );
 
-    updateUniformBuffer( new Float32Array( [ cellPixelSize ] ) );
+    updateUniformBuffer( new Float32Array( [ gameData.cellPixelSize ] ) );
 
     renderBindGroups = generateRenderBindGroups( device, renderBindGroupLayout, cellBuffers, initialGridState );
 
@@ -162,11 +166,11 @@ const gpuUniformBufferSize = 4;
     {
         // Rolling average frame time
         const currentFrameTime = iTimeStamp - previousTime;
-        averageFrameTime += ( currentFrameTime - frameTimes[ currentFrameTimeIndex ] ) / frameTimesSize;
+        gameData.averageFrameTime += ( currentFrameTime - frameTimes[ currentFrameTimeIndex ] ) / frameTimesSize;
         frameTimes[ currentFrameTimeIndex ] = currentFrameTime;
         currentFrameTimeIndex = ( currentFrameTimeIndex + 1 ) % frameTimesSize;
         previousTime = iTimeStamp;
-        InteractionHandler.displayAverageTime( averageFrameTime );
+        InteractionHandler.updateUI( gameData );
 
         // Get next available image view from swap chain
         renderPassDescriptor.colorAttachments[ 0 ].attachment = swapChain.getCurrentTexture().createView();
@@ -175,7 +179,7 @@ const gpuUniformBufferSize = 4;
 
         // Compute pass
         const timeSinceLastSimulation = iTimeStamp - previousSimulationTime;
-        if ( timeSinceLastSimulation > simulationTimeStep )
+        if ( timeSinceLastSimulation > gameData.simulationTimeStep )
         {
             const computePassEncoder = commandEncoder.beginComputePass();
             computePassEncoder.setPipeline( computePipelines[ computeMode ] );
@@ -200,7 +204,7 @@ const gpuUniformBufferSize = 4;
     }
 
     InteractionHandler = await interactionHandlerPromise;
-    InteractionHandler.updateUI( cellPixelSize );
+    InteractionHandler.updateUI( gameData );
     requestAnimationFrame( frame );
 } )();
 
@@ -331,8 +335,8 @@ function getGlobalDefines()
     let globalDefines =
         "#version 450\n" +
         "#define CELLS_COUNT " + cellsCount + "\n" +
-        "#define GRID_SIZE " + gridSize + "\n" +
-        "#define PIXELS_PER_CELL " + cellPixelSize + "\n";
+        "#define GRID_SIZE " + gameData.gridSize + "\n" +
+        "#define PIXELS_PER_CELL " + gameData.cellPixelSize + "\n";
     //if( gridSize <= 512){
     globalDefines += "#define HAS_GRID\n";
     //}
@@ -401,8 +405,8 @@ function createRenderPipelineFromShaders( iDevice, iRenderPipelineLayout, iVSCod
 function updateGridConstants( iGridSize )
 {
     cellsCount = iGridSize * iGridSize;
-    dispatchX = generateDispatchX( gridSize, threadsPerGroup );
-    dispatchY = generateDispatchY( gridSize, threadsPerGroup );
+    dispatchX = generateDispatchX( gameData.gridSize, threadsPerGroup );
+    dispatchY = generateDispatchY( gameData.gridSize, threadsPerGroup );
 }
 
 function rebuildPipelines( iGridSize )
@@ -448,7 +452,7 @@ async function updateUniformBuffer( iFloat32Data )
 
 export function setSimulationTimeStep( iFrameTime )
 {
-    simulationTimeStep = iFrameTime;
+    gameData.simulationTimeStep = iFrameTime;
 }
 
 export function changeTestCase( iCaseNumber )
@@ -463,7 +467,7 @@ export function changeTestCase( iCaseNumber )
 
 export function setGridSize( iGridSize )
 {
-    gridSize = iGridSize;
+    gameData.gridSize = iGridSize;
     computePipelines = [];
     updateGridConstants( iGridSize );
     rebuildPipelines( iGridSize );
@@ -471,7 +475,7 @@ export function setGridSize( iGridSize )
 
 export async function setCellSize( iCellSize )
 {
-    cellPixelSize = iCellSize;
-    updateGridConstants( gridSize );
+    gameData.cellPixelSize = iCellSize;
+    updateGridConstants( gameData.gridSize );
     updateUniformBuffer( new Float32Array( [ iCellSize ] ) );
 }
