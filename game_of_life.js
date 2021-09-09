@@ -58,13 +58,19 @@ const gpuUniformBufferSize = 4;
 {
     if ( !navigator.gpu )
     {
-        alert( 'WebGPU not supported! To see this content, you must use Chrome Canary and enable this UNSAFE flag: chrome://flags/#enable-unsafe-webgpu' );
+        alert( "WebGPU not supported! To see this content, you must use Chrome Canary and enable this UNSAFE flag: chrome://flags/#enable-unsafe-webgpu" );
     }
 
     const shaderCompilerPromise = ShaderCompilerModule();
     const interactionHandlerPromise = InteractionHandlerModule();
 
     const adapter = await navigator.gpu.requestAdapter();
+
+    if ( adapter === null )
+    {
+        alert( "WebGPU is supported but your browser won't give me an adapter :(" );
+    }
+
     device = await adapter.requestDevice();
 
     const context = canvas.getContext( 'webgpu' );
