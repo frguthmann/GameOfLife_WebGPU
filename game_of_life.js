@@ -67,7 +67,7 @@ const gpuUniformBufferSize = 4;
     const adapter = await navigator.gpu.requestAdapter();
     device = await adapter.requestDevice();
 
-    const context = canvas.getContext( 'gpupresent' );
+    const context = canvas.getContext( 'webgpu' );
 
     // COMPUTE PIPELINE SETUP
 
@@ -77,12 +77,16 @@ const gpuUniformBufferSize = 4;
         {
             binding: 0,
             visibility: GPUShaderStage.COMPUTE,
-            type: "storage-buffer"
+            buffer: {
+                type: "storage",
+            }
         },
         {
             binding: 1,
             visibility: GPUShaderStage.COMPUTE,
-            type: "storage-buffer"
+            buffer: {
+                type: "storage",
+            }
         } ],
     } );
 
@@ -101,7 +105,7 @@ const gpuUniformBufferSize = 4;
 
     // RENDER PIPELINE SETUP
 
-    const swapChain = context.configureSwapChain(
+    context.configure(
     {
         device,
         format: swapChainFormat
@@ -113,12 +117,16 @@ const gpuUniformBufferSize = 4;
         {
             binding: 0,
             visibility: GPUShaderStage.FRAGMENT,
-            type: "storage-buffer"
+            buffer: {
+                type: "storage",
+            }
         },
         {
             binding: 1,
             visibility: GPUShaderStage.FRAGMENT,
-            type: "uniform-buffer"
+            buffer: {
+                type: "uniform",
+            }
         } ],
     } );
 
@@ -171,7 +179,7 @@ const gpuUniformBufferSize = 4;
         InteractionHandler.displayAverageTime( averageFrameTime );
 
         // Get next available image view from swap chain
-        renderPassDescriptor.colorAttachments[ 0 ].attachment = swapChain.getCurrentTexture().createView();
+        renderPassDescriptor.colorAttachments[ 0 ].view = context.getCurrentTexture().createView();
         const commandEncoder = device.createCommandEncoder(
         {} );
 
@@ -197,7 +205,7 @@ const gpuUniformBufferSize = 4;
         renderPassEncoder.endPass();
 
         // Submit commands to the GPU
-        device.defaultQueue.submit( [ commandEncoder.finish() ] );
+        device.queue.submit( [ commandEncoder.finish() ] );
         requestAnimationFrame( frame );
     }
 
@@ -358,7 +366,7 @@ function createComputePipelineFromShader( iDevice, iLayout, iShader )
     return iDevice.createComputePipeline(
     {
         layout: iLayout,
-        computeStage:
+        compute:
         {
             module: iDevice.createShaderModule(
             {
@@ -375,7 +383,7 @@ function createRenderPipelineFromShaders( iDevice, iRenderPipelineLayout, iVSCod
     {
         layout: iRenderPipelineLayout,
 
-        vertexStage:
+        vertex:
         {
             module: iDevice.createShaderModule(
             {
@@ -383,13 +391,18 @@ function createRenderPipelineFromShaders( iDevice, iRenderPipelineLayout, iVSCod
             } ),
             entryPoint: "main"
         },
-        fragmentStage:
+        fragment:
         {
             module: iDevice.createShaderModule(
             {
                 code: ShaderCompiler.compileShader( iFSCode, "fragment" ),
             } ),
-            entryPoint: "main"
+            entryPoint: "main",
+            targets: [
+                {
+                  format: swapChainFormat
+                }
+            ],
         },
 
         primitiveTopology: "triangle-list",
@@ -445,7 +458,7 @@ async function updateUniformBuffer( iFloat32Data )
         const commandEncoder = device.createCommandEncoder(
         {} );
         commandEncoder.copyBufferToBuffer( gpuStagingUniformBuffer, 0, gpuUniformBuffer, 0, gpuUniformBufferSize );
-        device.defaultQueue.submit( [ commandEncoder.finish() ] );
+        device.queue.submit( [ commandEncoder.finish() ] );
     }
 }
 

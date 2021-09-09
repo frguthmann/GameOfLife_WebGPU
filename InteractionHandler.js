@@ -46,7 +46,7 @@ displayFolder.open();
 // Simulation GUI
 
 const simulationFolder = gui.addFolder( "Simulation" );
-simulationFolder.add( guiData, "simulationTimeStep", 1 ).min( 1 ).step( 1 ).name( "Time step " ).onChange( setSimulationTimeStep );
+simulationFolder.add( guiData, "simulationTimeStep", 0 ).min( 0 ).step( 1 ).name( "Time step " ).onChange( setSimulationTimeStep );
 simulationFolder.open();
 
 // Metrics GUI
