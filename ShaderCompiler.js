@@ -1,4 +1,5 @@
 import glslangModule from 'https://unpkg.com/@webgpu/glslang@0.0.8/dist/web-devel/glslang.js';
+import * as tintModule from './ext/twgsl.js';
 
 function addLineNumbers( iString )
 {
@@ -13,20 +14,22 @@ function addLineNumbers( iString )
 export default async function()
 {
     const glslang = await glslangModule();
+    const tintWASM = await twgsl("ext/twgsl.wasm");
 
     return {
         compileShader: function compileShader( iShaderCode, iMode )
         {
-            let compiledComputeCode;
+            let compiledCode;
             try
             {
-                compiledComputeCode = glslang.compileGLSL( iShaderCode, iMode );
+                const spirvCode = glslang.compileGLSL( iShaderCode, iMode );
+                compiledCode = tintWASM.convertSpirV2WGSL( spirvCode );
             }
             catch ( e )
             {
                 console.log( addLineNumbers( iShaderCode ) );
             };
-            return compiledComputeCode;
+            return compiledCode;
         }
     };
 };
