@@ -164,13 +164,14 @@ const gpuUniformBufferSize = 4;
     const renderPassDescriptor = {
         colorAttachments: [
         {
-            loadValue:
-            {
+            loadOp: "clear",
+            clearValue: {
                 r: 1.0,
                 g: 0.5,
                 b: 0.5,
                 a: 1.0
             },
+            storeOp: "store",
         } ]
     };
 
@@ -196,8 +197,8 @@ const gpuUniformBufferSize = 4;
             const computePassEncoder = commandEncoder.beginComputePass();
             computePassEncoder.setPipeline( computePipelines[ computeMode ] );
             computePassEncoder.setBindGroup( 0, computeBindGroups[ currentComputeBuffer ] );
-            computePassEncoder.dispatch( dispatchX[ computeMode ], dispatchY[ computeMode ] );
-            computePassEncoder.endPass();
+            computePassEncoder.dispatchWorkgroups( dispatchX[ computeMode ], dispatchY[ computeMode ] );
+            computePassEncoder.end();
 
             previousSimulationTime = iTimeStamp;
             currentComputeBuffer = currentComputeBuffer > 0 ? 0 : 1;
@@ -208,7 +209,7 @@ const gpuUniformBufferSize = 4;
         renderPassEncoder.setPipeline( renderPipeline );
         renderPassEncoder.setBindGroup( 0, renderBindGroups[ currentComputeBuffer ] );
         renderPassEncoder.draw( 3, 1, 0, 0 );
-        renderPassEncoder.endPass();
+        renderPassEncoder.end();
 
         // Submit commands to the GPU
         device.queue.submit( [ commandEncoder.finish() ] );
